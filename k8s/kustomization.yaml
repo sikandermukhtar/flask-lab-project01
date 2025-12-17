@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: hospital-dev
+
+resources:
+  - namespaces/
+  - configs/
+  - deployments/
+  - services/
+  - ingress/
+
+configMapGenerator:
+  - name: hospital-config
+    literals:
+      - APP_HOST=0.0.0.0
+      - APP_PORT=5000
+      - FLASK_ENV=production
+      - DB_NAME=hospital_db
+      - DB_PORT=5432
+      - REDIS_PORT=6379
+
+secretGenerator:
+  - name: hospital-secrets
+    literals:
+      - DB_PASSWORD=placeholder
+      - REDIS_PASSWORD=placeholder
+      - SECRET_KEY=placeholder
+    type: Opaque
