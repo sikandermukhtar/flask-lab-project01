@@ -1,0 +1,70 @@
+# Grafana Helm chart values
+
+adminUser: admin
+adminPassword: "{{ .Values.adminPassword }}"  # Set via GitHub secret
+
+persistence:
+  enabled: true
+  size: 10Gi
+  accessModes:
+    - ReadWriteOnce
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 1Gi
+    cpu: 500m
+
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: false
+
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+  datasources:
+    enabled: true
+    label: grafana_datasource
+
+grafana.ini:
+  server:
+    domain: fa22bcs008.grafana.net  # CHANGE THIS
+    root_url: http://fa22bcs008.grafana.net  # CHANGE THIS
+  auth:
+    disable_login_form: false
+    disable_signout_menu: false
+  auth.anonymous:
+    enabled: false
+  security:
+    admin_password: "{{ .Values.adminPassword }}"
+
+# Pre-configured dashboards
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+# Dashboards to import
+dashboards:
+  default:
+    hospital-dashboard:
+      gnetId: 0
+      datasource: Prometheus
+      url: https://raw.githubusercontent.com/your-username/hospital-management-system/main/monitoring/grafana/dashboards/hospital-dashboard.json
+      json: |
+        # Dashboard JSON will be here

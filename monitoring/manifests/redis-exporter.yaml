@@ -1,0 +1,52 @@
+# Redis Exporter for Prometheus
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-exporter
+  template:
+    metadata:
+      labels:
+        app: redis-exporter
+    spec:
+      containers:
+      - name: redis-exporter
+        image: oliver006/redis_exporter:latest
+        args:
+          - "--redis.addr=redis://redis-service.hospital-dev:6379"
+          - "--redis.password=$(REDIS_PASSWORD)"
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: hospital-secrets
+              namespace: hospital-dev
+              key: REDIS_PASSWORD
+        ports:
+        - containerPort: 9121
+          name: metrics
+        resources:
+          requests:
+            memory: 64Mi
+            cpu: 50m
+          limits:
+            memory: 128Mi
+            cpu: 100m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+spec:
+  selector:
+    app: redis-exporter
+  ports:
+  - port: 9121
+    targetPort: metrics
+    name: metrics
