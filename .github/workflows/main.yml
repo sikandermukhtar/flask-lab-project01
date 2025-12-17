@@ -51,7 +51,7 @@ jobs:
         echo "Bandit scan completed"
     
     - name: Check for secrets in code
-      uses: secret-scanner/action@master
+      uses: secret-scanner/action@main
       with:
         scan-path: ./
     
