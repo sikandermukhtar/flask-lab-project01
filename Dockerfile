@@ -1,5 +1,5 @@
 # ============ BUILD STAGE ============
-FROM python:3.9-slim as builder
+FROM python:3.11-slim as builder  # CHANGED FROM 3.9 TO 3.11
 
 WORKDIR /app
 
@@ -22,10 +22,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir gunicorn==20.1.0 prometheus-flask-exporter==0.22.4 redis==4.5.4
+    pip install --no-cache-dir gunicorn prometheus-flask-exporter redis
 
 # ============ RUNTIME STAGE ============
-FROM python:3.9-slim
+FROM python:3.11-slim  # CHANGED FROM 3.9 TO 3.11
 
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y \
