@@ -1,0 +1,168 @@
+---
+- name: Configure and Deploy Hospital Management System
+  hosts: webservers
+  become: yes
+  vars_files:
+    - group_vars/all.yml
+
+  tasks:
+    # 1. Update system
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    # 2. Install Docker and dependencies
+    - name: Install required packages
+      apt:
+        name:
+          - docker.io
+          - docker-compose
+          - python3-pip
+          - python3-venv
+          - postgresql-client
+          - redis-tools
+          - curl
+          - git
+        state: present
+
+    - name: Ensure Docker is running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add user to docker group
+      user:
+        name: "{{ app_user }}"
+        groups: docker
+        append: yes
+
+    # 3. Install kubectl (if managing Kubernetes)
+    - name: Download kubectl binary
+      get_url:
+        url: "https://dl.k8s.io/release/{{ k8s_version | default('v1.28.0') }}/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+
+    - name: Verify kubectl installation
+      command: kubectl version --client
+      register: kubectl_check
+      changed_when: false
+
+    # 4. Configure AWS CLI
+    - name: Install AWS CLI
+      apt:
+        name: awscli
+        state: present
+
+    - name: Create AWS config directory
+      file:
+        path: "{{ ansible_user_dir }}/.aws"
+        state: directory
+        mode: '0700'
+
+    - name: Configure AWS credentials
+      template:
+        src: aws_credentials.j2
+        dest: "{{ ansible_user_dir }}/.aws/credentials"
+        mode: '0600'
+
+    # 5. Deploy application with Docker Compose
+    - name: Create application directory
+      file:
+        path: "/opt/{{ app_name }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+
+    - name: Copy Docker Compose files
+      copy:
+        src: "{{ playbook_dir }}/../docker-compose.yml"
+        dest: "/opt/{{ app_name }}/docker-compose.yml"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+
+    - name: Copy environment file
+      template:
+        src: app.env.j2
+        dest: "/opt/{{ app_name }}/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0600'
+
+    - name: Start application with Docker Compose
+      community.docker.docker_compose:
+        project_src: "/opt/{{ app_name }}"
+        state: present
+
+    # 6. Configure systemd service (optional)
+    - name: Create systemd service file
+      template:
+        src: app.service.j2
+        dest: /etc/systemd/system/{{ app_name }}.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - reload systemd
+        - restart application
+
+    # 7. Configure Nginx as reverse proxy
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Configure Nginx site
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/sites-available/{{ app_name }}
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Enable Nginx site
+      file:
+        src: /etc/nginx/sites-available/{{ app_name }}
+        dest: /etc/nginx/sites-enabled/{{ app_name }}
+        state: link
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+
+    - name: Restart Nginx if configuration valid
+      service:
+        name: nginx
+        state: restarted
+      when: nginx_test.rc == 0
+
+    # 8. Deploy to Kubernetes (if EKS is configured)
+    - name: Update kubeconfig for EKS cluster
+      shell: |
+        aws eks update-kubeconfig \
+          --region us-east-1 \
+          --name {{ k8s_cluster_name }}
+      environment:
+        AWS_ACCESS_KEY_ID: "{{ aws_access_key }}"
+        AWS_SECRET_ACCESS_KEY: "{{ aws_secret_key }}"
+
+    - name: Apply Kubernetes manifests
+      kubernetes.core.k8s:
+        kubeconfig: "{{ ansible_user_dir }}/.kube/config"
+        src: "{{ playbook_dir }}/../k8s/"
+        state: present
+      when: k8s_cluster_name != ""
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: restart application
+      systemd:
+        name: "{{ app_name }}"
+        state: restarted
+        enabled: yes

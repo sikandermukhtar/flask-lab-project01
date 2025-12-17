@@ -1,0 +1,14 @@
+---
+collections:
+  - name: amazon.aws
+    version: ">=6.0.0"
+  - name: community.aws
+    version: ">=6.0.0"
+  - name: kubernetes.core
+    version: ">=2.4.0"
+
+roles:
+  - name: geerlingguy.docker
+    version: "6.0.4"
+  - name: geerlingguy.kubernetes
+    version: "2.9.0"

@@ -1,0 +1,26 @@
+---
+# Application variables
+app_name: "hospital-management"
+app_user: "ubuntu"
+app_port: 5000
+docker_registry: "{{ docker_username | default('YOUR_DOCKER_USERNAME') }}/hospital-management-system"
+
+# Database variables (filled by Terraform outputs)
+db_host: "{{ rds_endpoint | default('localhost') }}"
+db_name: "hospital_db"
+db_user: "postgres"
+db_password: "{{ vault_db_password | default('CHANGE_ME') }}"
+
+# Redis variables
+redis_host: "{{ redis_endpoint | default('localhost') }}"
+redis_port: 6379
+redis_password: "{{ vault_redis_password | default('CHANGE_ME') }}"
+
+# Kubernetes variables
+k8s_namespace: "hospital-{{ env | default('dev') }}"
+k8s_cluster_name: "hospital-cluster-{{ env | default('dev') }}"
+
+# Ansible settings
+ansible_connection: ssh
+ansible_become: yes
+ansible_become_method: sudo
