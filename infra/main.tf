@@ -11,7 +11,7 @@ terraform {
   
   # Store Terraform state in S3 (configure after first run)
   backend "s3" {
-    bucket = "devops-final-tf-state"   # must already exist
+    bucket = "hospital-tf-state"   # must already exist
     key    = "hospital/terraform.tfstate"
     region = "us-east-1"
   }

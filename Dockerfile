@@ -1,5 +1,5 @@
 # ============ BUILD STAGE ============
-FROM python:3.11-slim as builder  # CHANGED FROM 3.9 TO 3.11
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir gunicorn prometheus-flask-exporter redis
 
 # ============ RUNTIME STAGE ============
-FROM python:3.11-slim  # CHANGED FROM 3.9 TO 3.11
+FROM python:3.11-slim
 
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y \
