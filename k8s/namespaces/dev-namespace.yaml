@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hospital-dev
+  labels:
+    name: hospital-dev
+    environment: development
+    managed-by: terraform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hospital-prod
+  labels:
+    name: hospital-prod
+    environment: production
+    managed-by: terraform
