@@ -120,7 +120,7 @@ variable "rds_port" {
 variable "s3_bucket_name" {
   description = "S3 bucket name for static files"
   type        = string
-  default     = "hospital-static-files"
+  default     = "hospital-tf-state"
 }
 
 # ============ EC2 Configuration (Fallback) ============

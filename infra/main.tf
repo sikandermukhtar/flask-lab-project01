@@ -10,11 +10,13 @@ terraform {
   }
   
   # Store Terraform state in S3 (configure after first run)
+/* 
   backend "s3" {
     bucket = "hospital-tf-state"   # must already exist
     key    = "hospital/terraform.tfstate"
     region = "us-east-1"
   }
+*/  
 }
 
 provider "aws" {
@@ -365,4 +367,28 @@ resource "aws_iam_role_policy_attachment" "eks_node_AmazonEKSWorkerNodePolicy" {
 resource "aws_iam_role_policy_attachment" "eks_node_AmazonEC2ContainerRegistryReadOnly" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   role       = aws_iam_role.eks_node.name
+}
+
+# Add this to your main.tf BEFORE the backend configuration can work
+resource "aws_s3_bucket" "terraform_state" {
+  bucket = "hospital-tf-state"  # Must be globally unique
+  
+  # Enable versioning so we can see the full revision history of our state files
+  versioning {
+    enabled = true
+  }
+  
+  # Enable server-side encryption by default
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+  
+  tags = {
+    Name        = "Terraform State Bucket"
+    Environment = "Global"
+  }
 }

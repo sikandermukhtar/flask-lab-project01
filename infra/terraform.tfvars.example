@@ -28,7 +28,7 @@ rds_password = "YourSecurePassword123!"  # CHANGE THIS!
 rds_port = 5432
 
 # S3 Configuration
-s3_bucket_name = "hospital-static-files"
+s3_bucket_name = "hospital-tf-state"
 
 # EC2 Fallback
 enable_ec2_fallback = false
