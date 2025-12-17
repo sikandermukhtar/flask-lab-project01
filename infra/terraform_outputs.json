@@ -1,0 +1,121 @@
+{
+  "app_security_group_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "sg-0f2716bd257e8e5f7"
+  },
+  "database_connection_string": {
+    "sensitive": true,
+    "type": "string",
+    "value": "postgresql://postgres:YourSecurePassword123!@hospital-management-postgres-dev.ckzais6serts.us-east-1.rds.amazonaws.com:5432/hospital_db"
+  },
+  "ec2_instance_ids": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      []
+    ],
+    "value": []
+  },
+  "ec2_instance_public_ips": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      []
+    ],
+    "value": []
+  },
+  "eks_cluster_certificate_authority_data": {
+    "sensitive": true,
+    "type": "string",
+    "value": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJUDJyY1d1SUgyZzh3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TlRFeU1UY3dNekF5TkRGYUZ3MHpOVEV5TVRVd016QTNOREZhTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUURCM1lZcmJYWVZzNFM5Z3JiclN6cXFUMDVFRHhmUjZQSkhSTHNhZTU5cXZiL0xpNFlINmpsT2FCUzkKbldtZUN3aExUN1F4VVE1QTdaUVhZUGdhVVJiUUc4c0kvNGVxTmw4RnhmY01DWWwwVVk3c2JGQ2hKNmJNTFhJYwpkdU5ndk9LdHcyeWw5Z1NUT1MxN1duUjl4b0szV2drSnU1MVlYOUtXMVdZT2RJMWY5UW1sYnNyUmFaRkowR0xECklXN1UweThCZmxIZnllN2p6YitIR3JhTURqdjRIdU1XUGpZbFpuYzlGNlNqVVpFTzB1TkZOb3MzT2l1N3Eyc0cKektPYmt6Z09jcTNBMEIxdEZmQ0c5Z3RKV1JTcFRVN3B1OWcyUUg5Z0VGTTZtenpLNXhhUjBVREsydGRrbXFLSgpVWWxzT2lSaFdTMC84eStSVFZSYVBQNzJtaCtyQWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJTYWdYYkNOMjdLaXlGM3lOcXZlbEVEQmFiSE5EQVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQXJzZ3lwU3BoOQp0NUV3c3Z6Y080UVF5T0wxTWxnendGMG5HeWR2OUVWQ2JrQU95emw2WnZBSmNTbDJWUTFqUFM0WFhuWEYxcGkzCmtlcXp0SHZDQnByZzlaN20ydWFlY0FQZC91LzdDK1U4a3k4QWUvKys1TWxQTk9rNEduMzduWHhmSm1MWXFOOUIKVUlNTHhxSlBHU3A5aG1qTU5KTkhWL1prNHJLbVRMeEl1Z3RoallQNkZka1duRTNpUkx1ZVVMOXJ3eUlqWXMzNApPNUZJTXArVUx4S3BOdXdybFR1cVNoSU96RW91L29UNlQ3UVU1YVlUdC9PbmJEVW8zMXV1NkFycXA1anJMM29OCi9wRDJVNTAyamJCeUZsY1MzZWdrOFNXOFE3bE9vaUQ2cWIrdWo1M1pHcWMrZGwrYU1DaXB3Z2QybGd1S0lKV1UKZ0ZsTU5DQ2dIQ2srCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K"
+  },
+  "eks_cluster_endpoint": {
+    "sensitive": true,
+    "type": "string",
+    "value": "https://07967F81FB559D662C4F671FD927CE32.gr7.us-east-1.eks.amazonaws.com"
+  },
+  "eks_cluster_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "hospital-cluster-dev"
+  },
+  "eks_cluster_security_group_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "sg-05f46963686bbd7b1"
+  },
+  "private_subnets": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "subnet-0b98201dd24809eea",
+      "subnet-060598ab6a17dcfbd"
+    ]
+  },
+  "public_subnets": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "subnet-039d05c58c71faed0",
+      "subnet-01531abc9e9c3ddd3"
+    ]
+  },
+  "rds_address": {
+    "sensitive": false,
+    "type": "string",
+    "value": "hospital-management-postgres-dev.ckzais6serts.us-east-1.rds.amazonaws.com"
+  },
+  "rds_database_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "hospital_db"
+  },
+  "rds_endpoint": {
+    "sensitive": false,
+    "type": "string",
+    "value": "hospital-management-postgres-dev.ckzais6serts.us-east-1.rds.amazonaws.com:5432"
+  },
+  "rds_port": {
+    "sensitive": false,
+    "type": "number",
+    "value": 5432
+  },
+  "rds_security_group_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "sg-0649f2ad55912186a"
+  },
+  "s3_bucket_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:s3:::hospital-static-files-dev-c6d1d392a708786a"
+  },
+  "s3_bucket_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "hospital-static-files-dev-c6d1d392a708786a"
+  },
+  "vpc_cidr": {
+    "sensitive": false,
+    "type": "string",
+    "value": "10.0.0.0/16"
+  },
+  "vpc_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "vpc-054a3a38b07d5c0d6"
+  }
+}
