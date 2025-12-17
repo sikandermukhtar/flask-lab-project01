@@ -1,0 +1,397 @@
+name: Hospital Management System CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual triggers
+
+env:
+  APP_NAME: "hospital-management-system"
+  AWS_REGION: "us-east-1"
+  DOCKER_REGISTRY: "docker.io"
+  TF_WORKSPACE: "dev"
+  K8S_NAMESPACE: "hospital-dev"
+  EKS_CLUSTER: "hospital-cluster-dev"
+
+jobs:
+  # ============ SECURITY & LINTING ============
+  security-scan:
+    runs-on: ubuntu-latest
+    name: "🔒 Security Scan"
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Snyk Security Scan
+      uses: snyk/actions/python@main
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
+    
+    - name: Run Bandit Security Scanner
+      run: |
+        pip install bandit
+        bandit -r . -f json -o bandit-report.json
+        echo "Bandit scan completed"
+    
+    - name: Check for secrets in code
+      uses: secret-scanner/action@main
+      with:
+        scan-path: ./
+    
+    - name: Dependency Vulnerability Scan
+      uses: actions/dependency-review-action@v3
+
+  # ============ BUILD & TEST ============
+  build-and-test:
+    runs-on: ubuntu-latest
+    name: "🧪 Build & Test"
+    needs: security-scan
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: hospital_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov flake8 black mypy
+    
+    - name: Run linters
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        black --check --diff .
+        mypy .
+    
+    - name: Run tests with coverage
+      env:
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      run: |
+        python -m pytest tests/ --cov=./ --cov-report=xml --cov-report=html
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  # ============ DOCKER BUILD & PUSH ============
+  docker-build:
+    runs-on: ubuntu-latest
+    name: "🐳 Build & Push Docker"
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=sha,prefix={{branch}}-
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+    
+    - name: Scan Docker image for vulnerabilities
+      run: |
+        docker scan ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:latest --severity high
+
+  # ============ TERRAFORM DEPLOY ============
+  terraform-deploy:
+    runs-on: ubuntu-latest
+    name: "🏗️ Terraform Deploy"
+    needs: docker-build
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+    
+    - name: Terraform Init
+      working-directory: ./infra
+      run: terraform init
+    
+    - name: Terraform Plan
+      working-directory: ./infra
+      run: |
+        terraform plan \
+          -var="db_password=${{ secrets.TF_DB_PASSWORD }}" \
+          -var="environment=${{ env.TF_WORKSPACE }}" \
+          -out=tfplan
+    
+    - name: Terraform Apply
+      working-directory: ./infra
+      run: terraform apply -auto-approve tfplan
+    
+    - name: Get Terraform outputs
+      working-directory: ./infra
+      run: terraform output -json > terraform_outputs.json
+    
+    - name: Upload Terraform outputs
+      uses: actions/upload-artifact@v3
+      with:
+        name: terraform-outputs
+        path: ./infra/terraform_outputs.json
+
+  # ============ KUBERNETES DEPLOY ============
+  kubernetes-deploy:
+    runs-on: ubuntu-latest
+    name: "☸️ Kubernetes Deploy"
+    needs: terraform-deploy
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+    
+    - name: Configure EKS cluster
+      run: |
+        aws eks update-kubeconfig \
+          --region ${{ env.AWS_REGION }} \
+          --name ${{ env.EKS_CLUSTER }}
+    
+    - name: Create Kubernetes secrets
+      run: |
+        kubectl create secret generic hospital-secrets \
+          --namespace ${{ env.K8S_NAMESPACE }} \
+          --from-literal=DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
+          --from-literal=REDIS_PASSWORD='${{ secrets.REDIS_PASSWORD }}' \
+          --from-literal=SECRET_KEY='${{ secrets.SECRET_KEY }}' \
+          --dry-run=client -o yaml | kubectl apply -f -
+    
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl apply -f k8s/namespaces/
+        kubectl apply -f k8s/configs/
+        kubectl apply -f k8s/deployments/
+        kubectl apply -f k8s/services/
+        kubectl apply -f k8s/ingress/
+    
+    - name: Wait for deployment
+      run: |
+        kubectl rollout status deployment/hospital-app -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+        kubectl rollout status deployment/redis -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+    
+    - name: Verify deployment
+      run: |
+        kubectl get pods -n ${{ env.K8S_NAMESPACE }}
+        kubectl get services -n ${{ env.K8S_NAMESPACE }}
+        kubectl get ingress -n ${{ env.K8S_NAMESPACE }}
+
+  # ============ ANSIBLE DEPLOY (Alternative) ============
+  ansible-deploy:
+    runs-on: ubuntu-latest
+    name: "⚙️ Ansible Deploy"
+    needs: terraform-deploy
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Ansible
+      run: |
+        pip install ansible
+        ansible-galaxy collection install -r ansible/requirements.yml
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Run Ansible playbook
+      run: |
+        cd ansible
+        ansible-playbook playbook.yml \
+          -i inventory/hosts.ini \
+          --extra-vars "aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" \
+          --extra-vars "aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+          --extra-vars "db_password=${{ secrets.DB_PASSWORD }}" \
+          --extra-vars "redis_password=${{ secrets.REDIS_PASSWORD }}"
+
+  # ============ SMOKE TESTS ============
+  smoke-tests:
+    runs-on: ubuntu-latest
+    name: "✅ Smoke Tests"
+    needs: [kubernetes-deploy, ansible-deploy]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Get Load Balancer URL
+      id: get-url
+      run: |
+        SERVICE_URL=$(kubectl get service app-service -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
+        echo "Service URL: $SERVICE_URL"
+    
+    - name: Run smoke tests
+      run: |
+        # Wait for service to be ready
+        echo "Waiting for service to be ready..."
+        sleep 60
+        
+        # Test health endpoint
+        echo "Testing health endpoint..."
+        curl -f http://${{ env.SERVICE_URL }}/health || exit 1
+        
+        # Test API endpoints
+        echo "Testing API endpoints..."
+        curl -f http://${{ env.SERVICE_URL }}/api/test || exit 1
+        
+        # Test metrics endpoint
+        echo "Testing metrics endpoint..."
+        curl -f http://${{ env.SERVICE_URL }}/metrics || exit 1
+        
+        # Test database connectivity
+        echo "Testing database connectivity..."
+        curl -f http://${{ env.SERVICE_URL }}/patient || exit 1
+        
+        echo "✅ All smoke tests passed!"
+    
+    - name: Send deployment notification
+      uses: rtCamp/action-slack-notify@v2
+      if: success()
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        SLACK_CHANNEL: deployments
+        SLACK_COLOR: good
+        SLACK_TITLE: "✅ Deployment Successful"
+        SLACK_MESSAGE: "Hospital Management System deployed to ${{ env.EKS_CLUSTER }}"
+        SLACK_FOOTER: "Commit: ${{ github.sha }}"
+
+  # ============ MONITORING DEPLOY ============
+  monitoring-deploy:
+    runs-on: ubuntu-latest
+    name: "📊 Monitoring Deploy"
+    needs: kubernetes-deploy
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+    
+    - name: Add Helm repositories
+      run: |
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        helm repo add grafana https://grafana.github.io/helm-charts
+        helm repo update
+    
+    - name: Deploy Prometheus
+      run: |
+        helm upgrade --install prometheus prometheus-community/prometheus \
+          --namespace monitoring \
+          --create-namespace \
+          --values monitoring/prometheus/values.yaml
+    
+    - name: Deploy Grafana
+      run: |
+        helm upgrade --install grafana grafana/grafana \
+          --namespace monitoring \
+          --create-namespace \
+          --values monitoring/grafana/values.yaml \
+          --set adminPassword=${{ secrets.GRAFANA_PASSWORD }}
